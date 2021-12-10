@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 # from plot import *
 
 # -------------------- configurable params --------------------
-delta_t = 0.1
+delta_t = 1
 num_fragments = 100
 
 # -------------------- physical constants --------------------
@@ -31,8 +31,9 @@ coord_bh = np.array([0, 0])
 # -------------------- code --------------------
 
 rng = np.random.default_rng()
-cumu_coord_x_list = []
-cumu_coord_y_list = []
+cumu_coord_x_list = [[] for i in range (num_fragments)]
+cumu_coord_y_list = [[] for i in range (num_fragments)]
+color_list = []
 
 class pointmass:
     def __init__(self, _mass, _velocity, _coord):
@@ -45,9 +46,9 @@ class pointmass:
 
     def apply_force(self):
         d = np.linalg.norm(self.coord - coord_bh) # in km
-        accleration = G * mass_bh / (d * d) # in kg*km/s^2
-        accleration += rng.uniform(-1 * accleration, 1 * accleration)
-        self.v += accleration * delta_t
+        accleration_val = G * mass_bh / (d * d) # in kg*km/s^2
+        accleration_dir = (coord_bh - self.coord) / d
+        self.v += accleration_dir * accleration_val * delta_t
 
 class simulator:
     def __init__(self):
@@ -60,28 +61,12 @@ class simulator:
             self.fragments.append(
                 pointmass(mass_fragment, v, coord_init)
             )
+            color_list.append((rng.uniform(0, 1), rng.uniform(0, 1), rng.uniform(0, 1)))
 
-    def plot(self):
-        # init trivial things
-        fig, ax = plt.subplots() # note we must use plt.subplots, not plt.subplot
-        plt.xlim([-roche_limit * 2, roche_limit * 5])
-        plt.ylim([-roche_limit * 1.5, roche_limit * 3])
-        # plot black hole
-        bh = plt.Circle((0, 0), radius_bh, color='black')
-        ax.add_patch(bh)
-        # plot roche limit
-        circle = plt.Circle((0, 0), roche_limit, color='green', fill=False)
-        ax.add_patch(circle)
-        # plot point-mass fragments
-        coord_x_list, coord_y_list = [], []
-        for f in self.fragments:
-            coord_x_list.append(f.coord[0])
-            cumu_coord_x_list.append(f.coord[0])
-            coord_y_list.append(f.coord[1])
-            cumu_coord_y_list.append(f.coord[1])
-        plt.scatter(coord_x_list, coord_y_list, s=0.1)
-        # save figure
-        fig.savefig( str(self.t) + '.png')
+    def save(self):
+        for i, f in enumerate(self.fragments):
+            cumu_coord_x_list[i].append(f.coord[0])
+            cumu_coord_y_list[i].append(f.coord[1])
 
     def plot_cumu(self):
         # init trivial things
@@ -97,7 +82,8 @@ class simulator:
         circle = plt.Circle((0, 0), roche_limit, color='green', fill=False)
         ax.add_patch(circle)
         # plot point-mass fragments
-        plt.scatter(cumu_coord_x_list, cumu_coord_y_list, color='blue', s=0.1)
+        for i in range(num_fragments):
+            plt.plot(cumu_coord_x_list[i], cumu_coord_y_list[i], color=color_list[i])
         # save figure
         fig.savefig('cumu.png')
 
@@ -109,10 +95,9 @@ class simulator:
 
 if __name__ == "__main__":
     sim = simulator()
-    sim.plot()
-    for i in range(30000):
+    for i in range(10000):
         if i % 1000 == 0:
-            sim.plot()
+            sim.save()
             pass
         sim.run_step()
     sim.plot_cumu()
